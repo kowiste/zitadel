@@ -1,0 +1,22 @@
+# 1. Start with a standard Debian image that allows installing tools
+FROM debian:bookworm-slim
+
+# 2. Install necessary tools (curl for API calls, jq for JSON parsing)
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Copy the ZITADEL binary from the official image
+COPY --from=ghcr.io/zitadel/zitadel:latest /app/zitadel /app/zitadel
+
+# 4. Copy our custom scripts
+COPY wrapper-zitadel.sh /usr/local/bin/wrapper-zitadel.sh
+COPY setup_zitadel.sh /usr/local/bin/setup_zitadel.sh
+
+# 5. Make scripts executable
+RUN chmod +x /usr/local/bin/wrapper-zitadel.sh /usr/local/bin/setup_zitadel.sh
+
+# 6. Define the entrypoint
+ENTRYPOINT ["/usr/local/bin/wrapper-zitadel.sh"]

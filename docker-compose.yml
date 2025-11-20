@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # 1. The Database
+  mvp-db:
+    image: postgres:16-alpine
+    container_name: mvp-db
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel_password
+      POSTGRES_DB: zitadel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mvp-network
+    volumes:
+      - mvp_db_data:/var/lib/postgresql/data
+
+  # 2. The Custom ZITADEL
+  mvp-zitadel:
+    container_name: mvp-zitadel
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile-zitadel-combined
+    ports:
+      - "8080:8080"
+    networks:
+      - mvp-network
+    depends_on:
+      mvp-db:
+        condition: service_healthy
+    volumes:
+      # CRITICAL CHANGE: Mounts local ./secrets folder to container path /zitadel-pat-key
+      - ./secrets:/zitadel-pat-key
+    environment:
+      ZITADEL_MASTERKEY: "MasterkeyNeedsToHave32Characters"
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_TLS_ENABLED: false
+
+      # DB Config
+      ZITADEL_DATABASE_POSTGRES_HOST: mvp-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel_password
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel_password
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+
+      # Auto-Provisioning Config (writes PAT to the mounted volume)
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel-pat-key/admin.pat
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: mvp-admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: MVP Auto Provisioner
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: '2025-12-31T00:00:00Z'
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Password1!
+
+networks:
+  mvp-network:
+
+volumes:
+  mvp_db_data:
