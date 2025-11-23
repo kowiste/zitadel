@@ -55,7 +55,7 @@ func NewClientFromToken(baseURL, tokenPath string) (*Client, error) {
 }
 
 func (c *Client) CreateOrganization(orgName string) (string, error) {
-	url := fmt.Sprintf("%s/zitadel.org.v2beta.OrganizationService/CreateOrganization", c.baseURL)
+	url := fmt.Sprintf("%s/management/v1/orgs", c.baseURL)
 	jsonBody := []byte(fmt.Sprintf(`{"name": "%s"}`, orgName))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
@@ -76,8 +76,8 @@ func (c *Client) CreateOrganization(orgName string) (string, error) {
 }
 
 func (c *Client) ListOrganizations() (string, error) {
-	url := fmt.Sprintf("%s/zitadel.org.v2beta.OrganizationService/ListOrganizations", c.baseURL)
-	jsonBody := []byte(`{}`)
+	url := fmt.Sprintf("%s/admin/v1/orgs/_search", c.baseURL)
+	jsonBody := []byte(`{"queries": []}`)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
