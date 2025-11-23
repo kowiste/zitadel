@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
+	"zitadel/app"
 	"zitadel/domain"
 	"zitadel/zitauth"
 )
@@ -25,32 +27,55 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 2. CREATE ORGANIZATION
-	orgName := "TestOrg"
-	fmt.Println("\n=== Creating Organization ===")
-	org, err := client.CreateOrganization(orgName)
+	// Generate unique suffix
+	suffix := time.Now().Format("150405")
+
+	// 2. SETUP ORGANIZATION WITH PROJECT AND APPLICATION
+	orgName := fmt.Sprintf("TestOrg-%s", suffix)
+	projectName := "Main Project"
+	appName := "Web Application"
+	redirectURIs := []string{
+		"http://localhost:3000/auth/callback",
+		"http://localhost:8080/auth/callback",
+	}
+
+	setup, err := app.SetupOrgWithApp(client, orgName, projectName, appName, redirectURIs)
 	if err != nil {
-		fmt.Printf("Error creating organization: %v\n", err)
+		fmt.Printf("Error during setup: %v\n", err)
 		os.Exit(1)
 	}
-	prettyPrint(org)
-	fmt.Printf("\nCreated org with ID: %s\n", org.ID)
 
-	// 3. CREATE USER IN THE ORGANIZATION
-	fmt.Println("\n=== Creating User in Organization ===")
-	user, err := client.CreateUser(
-		"john.doe",
-		"john.doe@example.com",
+	fmt.Println("\n=== Setup Complete ===")
+	fmt.Println("\nOrganization:")
+	prettyPrint(setup.Organization)
+	fmt.Println("\nProject:")
+	prettyPrint(setup.Project)
+	fmt.Println("\nApplication:")
+	prettyPrint(setup.Application)
+
+	// 3. CREATE USER WITH PROJECT ACCESS
+	fmt.Println("\n=== Creating User with Project Access ===")
+	username := fmt.Sprintf("john.doe-%s", suffix)
+	email := fmt.Sprintf("john.doe-%s@example.com", suffix)
+	user, err := app.CreateUser(
+		client,
+		setup.Organization.ID,
+		setup.Project.ID,
+		username,
+		email,
 		"John",
 		"Doe",
 		"Password123!",
 	)
 	if err != nil {
 		fmt.Printf("Error creating user: %v\n", err)
-	} else {
-		prettyPrint(user)
+		os.Exit(1)
 	}
+	prettyPrint(user)
 
+}
+
+func lists(client domain.Auth) {
 	// 4. LIST ORGANIZATIONS
 	fmt.Println("\n=== Listing Organizations ===")
 	orgList, err := client.ListOrganizations()

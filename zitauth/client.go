@@ -69,6 +69,10 @@ func (c *Client) CreateOrganization(orgName string) (*domain.Organization, error
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
 	var org domain.Organization
 	if err := json.Unmarshal(resp.Body(), &org); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -96,7 +100,7 @@ func (c *Client) ListOrganizations() (*domain.OrganizationList, error) {
 	return &orgList, nil
 }
 
-func (c *Client) CreateUser(username, email, firstName, lastName, password string) (*domain.User, error) {
+func (c *Client) CreateUser(orgID, username, email, firstName, lastName, password string) (*domain.User, error) {
 	body := map[string]interface{}{
 		"userName": username,
 		"profile": map[string]string{
@@ -111,6 +115,7 @@ func (c *Client) CreateUser(username, email, firstName, lastName, password strin
 	}
 
 	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
 		SetBody(body).
 		Post("/management/v1/users/human/_import")
 
@@ -118,12 +123,22 @@ func (c *Client) CreateUser(username, email, firstName, lastName, password strin
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
-	var user domain.User
-	if err := json.Unmarshal(resp.Body(), &user); err != nil {
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	// Parse the response which has userId at the top level
+	var createResp struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.Unmarshal(resp.Body(), &createResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return &user, nil
+	// Return a User with the ID populated
+	return &domain.User{
+		ID: createResp.UserID,
+	}, nil
 }
 
 func (c *Client) ListUsers() (*domain.UserList, error) {
@@ -151,6 +166,120 @@ func (c *Client) DeleteUser(userID string) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) CreateProject(orgID, projectName string) (*domain.Project, error) {
+	body := map[string]interface{}{
+		"name":                  projectName,
+		"projectRoleAssertion":  false,
+		"projectRoleCheck":      false,
+		"hasProjectCheck":       false,
+		"privateLabelingSetting": "PRIVATE_LABELING_SETTING_ALLOW_LOGIN_USER_RESOURCE_OWNER_POLICY",
+	}
+
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(body).
+		Post("/management/v1/projects")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var project domain.Project
+	if err := json.Unmarshal(resp.Body(), &project); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &project, nil
+}
+
+func (c *Client) CreateOIDCWebApplication(orgID, projectID, appName string, redirectURIs []string) (*domain.Application, error) {
+	body := map[string]interface{}{
+		"name":                      appName,
+		"redirectUris":              redirectURIs,
+		"responseTypes":             []string{"OIDC_RESPONSE_TYPE_CODE"},
+		"grantTypes":                []string{"OIDC_GRANT_TYPE_AUTHORIZATION_CODE", "OIDC_GRANT_TYPE_REFRESH_TOKEN"},
+		"appType":                   "OIDC_APP_TYPE_WEB",
+		"authMethodType":            "OIDC_AUTH_METHOD_TYPE_BASIC",
+		"postLogoutRedirectUris":    redirectURIs,
+		"version":                   "OIDC_VERSION_1_0",
+		"devMode":                   false,
+		"accessTokenType":           "OIDC_TOKEN_TYPE_BEARER",
+		"accessTokenRoleAssertion":  true,
+		"idTokenRoleAssertion":      true,
+		"idTokenUserinfoAssertion":  true,
+		"clockSkew":                 "0s",
+		"skipNativeAppSuccessPage":  false,
+	}
+
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(body).
+		Post(fmt.Sprintf("/management/v1/projects/%s/apps/oidc", projectID))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var app domain.Application
+	if err := json.Unmarshal(resp.Body(), &app); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &app, nil
+}
+
+func (c *Client) GrantUserToProject(orgID, projectID, userID string) error {
+	body := map[string]interface{}{
+		"projectId": projectID,
+		"roleKeys":  []string{},
+	}
+
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(body).
+		Post(fmt.Sprintf("/management/v1/users/%s/grants", userID))
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+func (c *Client) GrantOrgToProject(orgID, projectID, grantedOrgID string) error {
+	body := map[string]interface{}{
+		"grantedOrgId": grantedOrgID,
+		"roleKeys":     []string{},
+	}
+
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(body).
+		Post(fmt.Sprintf("/management/v1/projects/%s/grants", projectID))
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
 	}
 
 	return nil

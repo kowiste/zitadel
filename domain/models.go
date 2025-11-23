@@ -32,3 +32,19 @@ type UserList struct {
 	Users       []User `json:"result"`
 	TotalResult string `json:"totalResult,omitempty"`
 }
+
+type Project struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	State        string    `json:"state"`
+	CreationDate time.Time `json:"creationDate"`
+	ChangedDate  time.Time `json:"changedDate"`
+}
+
+type Application struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	ClientID     string    `json:"clientId"`
+	ClientSecret string    `json:"clientSecret,omitempty"`
+	State        string    `json:"state"`
+}
