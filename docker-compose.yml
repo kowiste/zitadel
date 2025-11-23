@@ -34,7 +34,7 @@ services:
       mvp-db:
         condition: service_healthy
     volumes:
-      # CRITICAL CHANGE: Mounts local ./secrets folder to container path /zitadel-pat-key
+      # This volume is now mostly vestigial but kept for consistency
       - ./secrets:/zitadel-pat-key
     environment:
       ZITADEL_MASTERKEY: "MasterkeyNeedsToHave32Characters"
@@ -52,11 +52,16 @@ services:
       ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel_password
       ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
 
-      # Auto-Provisioning Config (writes PAT to the mounted volume)
-      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel-pat-key/admin.pat
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: mvp-admin
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: MVP Auto Provisioner
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: '2025-12-31T00:00:00Z'
+      # *** FIXED CLIENT CREDENTIALS SETUP ***
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_CLIENT_ID: go-client-id
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_CLIENT_SECRET: my-super-secure-secret-2025
+      
+      # Machine User Config
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: go-client-user
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Go Provisioner
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_CLIENT_SECRET_EXPIRATIONDATE: '2030-01-01T00:00:00Z'
+
+      # Default Human User 
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Password1!
 
