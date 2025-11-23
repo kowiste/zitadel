@@ -1,29 +1,33 @@
 package zitauth
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/go-resty/resty/v2"
+	"zitadel/domain"
 )
 
 type Client struct {
 	baseURL    string
 	token      string
-	httpClient *http.Client
+	httpClient *resty.Client
 }
 
 func NewClient(baseURL, token string) *Client {
+	client := resty.New()
+	client.SetTimeout(10 * time.Second)
+	client.SetBaseURL(baseURL)
+	client.SetHeader("Authorization", "Bearer "+token)
+	client.SetHeader("Content-Type", "application/json")
+
 	return &Client{
-		baseURL: baseURL,
-		token:   token,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		baseURL:    baseURL,
+		token:      token,
+		httpClient: client,
 	}
 }
 
@@ -54,59 +58,100 @@ func NewClientFromToken(baseURL, tokenPath string) (*Client, error) {
 	return NewClient(baseURL, token), nil
 }
 
-func (c *Client) CreateOrganization(orgName string) (string, error) {
-	url := fmt.Sprintf("%s/management/v1/orgs", c.baseURL)
-	jsonBody := []byte(fmt.Sprintf(`{"name": "%s"}`, orgName))
+func (c *Client) CreateOrganization(orgName string) (*domain.Organization, error) {
+	body := map[string]string{"name": orgName}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	resp, err := c.httpClient.R().
+		SetBody(body).
+		Post("/management/v1/orgs")
+
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute request: %w", err)
+	var org domain.Organization
+	if err := json.Unmarshal(resp.Body(), &org); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	return string(body), nil
+	return &org, nil
 }
 
-func (c *Client) ListOrganizations() (string, error) {
-	url := fmt.Sprintf("%s/admin/v1/orgs/_search", c.baseURL)
-	jsonBody := []byte(`{"queries": []}`)
+func (c *Client) ListOrganizations() (*domain.OrganizationList, error) {
+	body := map[string][]interface{}{"queries": {}}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	resp, err := c.httpClient.R().
+		SetBody(body).
+		Post("/admin/v1/orgs/_search")
+
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute request: %w", err)
+	var orgList domain.OrganizationList
+	if err := json.Unmarshal(resp.Body(), &orgList); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	return string(body), nil
+	return &orgList, nil
 }
 
-func PrettyPrintJSON(jsonStr string) error {
-	var obj interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &obj); err != nil {
-		return fmt.Errorf("failed to parse JSON: %w", err)
+func (c *Client) CreateUser(username, email, firstName, lastName, password string) (*domain.User, error) {
+	body := map[string]interface{}{
+		"userName": username,
+		"profile": map[string]string{
+			"firstName": firstName,
+			"lastName":  lastName,
+		},
+		"email": map[string]interface{}{
+			"email":           email,
+			"isEmailVerified": true,
+		},
+		"password": password,
 	}
 
-	pretty, err := json.MarshalIndent(obj, "", "  ")
+	resp, err := c.httpClient.R().
+		SetBody(body).
+		Post("/management/v1/users/human/_import")
+
 	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
+		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
-	fmt.Println(string(pretty))
+	var user domain.User
+	if err := json.Unmarshal(resp.Body(), &user); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (c *Client) ListUsers() (*domain.UserList, error) {
+	body := map[string][]interface{}{"queries": {}}
+
+	resp, err := c.httpClient.R().
+		SetBody(body).
+		Post("/management/v1/users/_search")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	var userList domain.UserList
+	if err := json.Unmarshal(resp.Body(), &userList); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &userList, nil
+}
+
+func (c *Client) DeleteUser(userID string) error {
+	_, err := c.httpClient.R().
+		Delete(fmt.Sprintf("/management/v1/users/%s", userID))
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
 	return nil
 }
