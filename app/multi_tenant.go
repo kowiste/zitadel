@@ -143,7 +143,7 @@ func AddTenant(
 			if err != nil {
 				fmt.Printf("⚠️  Failed to upload logo: %v\n", err)
 			} else {
-				fmt.Println("✓ Logo uploaded")
+				fmt.Println("✓ Logo uploaded (both banner logo and icon)")
 			}
 		} else {
 			fmt.Println("⚠️  No logo.svg found in theme directory")

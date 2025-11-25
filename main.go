@@ -91,9 +91,9 @@ func main() {
 	fmt.Println("\nℹ️  Default branding from theme/branding.json was automatically applied to all tenants.")
 	fmt.Println("Now let's demonstrate updating branding for specific tenants...")
 
-	// Example: Update Tesla branding with custom colors
+	// Example 1: Update Tesla with dark theme (red/black)
 	if len(tenants) > 0 {
-		fmt.Println("\n=== Customizing Tesla Branding ===")
+		fmt.Println("\n=== Customizing Tesla Branding (Dark Theme) ===")
 		teslaColors := &domain.BrandingConfig{
 			PrimaryColor:         "#e31937", // Tesla red
 			BackgroundColor:      "#000000", // Black
@@ -117,6 +117,36 @@ func main() {
 				fmt.Printf("⚠️  Error activating Tesla branding: %v\n", err)
 			} else {
 				fmt.Println("✓ Tesla branding activated")
+			}
+		}
+	}
+
+	// Example 2: Update Pepsi with light theme (blue/white)
+	if len(tenants) > 1 {
+		fmt.Println("\n=== Customizing Pepsi Branding (Light Theme) ===")
+		pepsiColors := &domain.BrandingConfig{
+			PrimaryColor:         "#0065C3", // Pepsi blue
+			BackgroundColor:      "#FFFFFF", // White
+			WarnColor:            "#E32934", // Pepsi red
+			FontColor:            "#000000", // Black text
+			PrimaryColorDark:     "#0065C3",
+			BackgroundColorDark:  "#FFFFFF",
+			WarnColorDark:        "#E32934",
+			FontColorDark:        "#ffffff",
+			HideLoginNameSuffix:  true,
+			DisableWatermark:     true,
+		}
+
+		err = client.UpdateOrgColors(tenants[1].Organization.ID, pepsiColors)
+		if err != nil {
+			fmt.Printf("⚠️  Error updating Pepsi branding: %v\n", err)
+		} else {
+			fmt.Println("✓ Pepsi branding colors updated to blue/white theme")
+			err = client.ActivateBranding(tenants[1].Organization.ID)
+			if err != nil {
+				fmt.Printf("⚠️  Error activating Pepsi branding: %v\n", err)
+			} else {
+				fmt.Println("✓ Pepsi branding activated")
 			}
 		}
 	}

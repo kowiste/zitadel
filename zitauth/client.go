@@ -336,17 +336,40 @@ func (c *Client) SetOrgBranding(orgID string, config *domain.BrandingConfig) err
 }
 
 func (c *Client) UploadOrgLogo(orgID string, logoPath string) error {
-	resp, err := c.httpClient.R().
-		SetHeader("x-zitadel-orgid", orgID).
-		SetFile("file", logoPath).
-		Post("/assets/v1/org/policy/label/logo")
-
-	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)
+	// Upload to all 4 logo endpoints (light/dark mode, logo/icon)
+	endpoints := []struct {
+		path string
+		name string
+	}{
+		{"/assets/v1/org/policy/label/logo", "logo (light)"},
+		{"/assets/v1/org/policy/label/logo/dark", "logo (dark)"},
+		{"/assets/v1/org/policy/label/icon", "icon (light)"},
+		{"/assets/v1/org/policy/label/icon/dark", "icon (dark)"},
 	}
 
-	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	successCount := 0
+	for _, endpoint := range endpoints {
+		resp, err := c.httpClient.R().
+			SetHeader("x-zitadel-orgid", orgID).
+			SetFile("file", logoPath).
+			Post(endpoint.path)
+
+		if err != nil {
+			fmt.Printf("  ⚠️  Failed to upload %s: %v\n", endpoint.name, err)
+			continue
+		}
+
+		if resp.StatusCode() >= 400 {
+			fmt.Printf("  ⚠️  %s upload failed (status %d): %s\n", endpoint.name, resp.StatusCode(), string(resp.Body()))
+			continue
+		}
+
+		fmt.Printf("  ✓ Uploaded %s\n", endpoint.name)
+		successCount++
+	}
+
+	if successCount == 0 {
+		return fmt.Errorf("all logo uploads failed")
 	}
 
 	return nil
