@@ -73,12 +73,45 @@ func (c *Client) CreateOrganization(orgName string) (*domain.Organization, error
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
 	}
 
-	var org domain.Organization
-	if err := json.Unmarshal(resp.Body(), &org); err != nil {
+	var createResp struct {
+		ID      string `json:"id"`
+		Details struct {
+			Sequence       string `json:"sequence"`
+			CreationDate   string `json:"creationDate"`
+			ResourceOwner  string `json:"resourceOwner"`
+		} `json:"details"`
+	}
+	if err := json.Unmarshal(resp.Body(), &createResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return &org, nil
+	// Debug: print the org ID we got
+	fmt.Printf("DEBUG - Created org with ID: %s\n", createResp.ID)
+
+	// Fetch full organization details including primary domain
+	return c.GetOrganization(createResp.ID)
+}
+
+func (c *Client) GetOrganization(orgID string) (*domain.Organization, error) {
+	resp, err := c.httpClient.R().
+		Get(fmt.Sprintf("/admin/v1/orgs/%s", orgID))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var result struct {
+		Org domain.Organization `json:"org"`
+	}
+	if err := json.Unmarshal(resp.Body(), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result.Org, nil
 }
 
 func (c *Client) ListOrganizations() (*domain.OrganizationList, error) {
@@ -273,6 +306,73 @@ func (c *Client) GrantOrgToProject(orgID, projectID, grantedOrgID string) error 
 		SetHeader("x-zitadel-orgid", orgID).
 		SetBody(body).
 		Post(fmt.Sprintf("/management/v1/projects/%s/grants", projectID))
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+func (c *Client) SetOrgBranding(orgID string, config *domain.BrandingConfig) error {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(config).
+		Post("/management/v1/policies/label")
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+func (c *Client) UploadOrgLogo(orgID string, logoPath string) error {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetFile("file", logoPath).
+		Post("/assets/v1/org/policy/label/logo")
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+func (c *Client) UpdateOrgColors(orgID string, config *domain.BrandingConfig) error {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(config).
+		Put("/management/v1/policies/label")
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+func (c *Client) ActivateBranding(orgID string) error {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		Post("/management/v1/policies/label/_activate")
 
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)

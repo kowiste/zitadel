@@ -1,0 +1,12 @@
+{
+  "primaryColor": "#5469d4",
+  "backgroundColor": "#ffffff",
+  "warnColor": "#ff3b5b",
+  "fontColor": "#000000",
+  "primaryColorDark": "#5469d4",
+  "backgroundColorDark": "#1a1a1a",
+  "warnColorDark": "#ff3b5b",
+  "fontColorDark": "#ffffff",
+  "hideLoginNameSuffix": true,
+  "disableWatermark": true
+}
