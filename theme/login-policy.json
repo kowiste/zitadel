@@ -1,0 +1,12 @@
+{
+  "allowRegister": false,
+  "allowUsernamePassword": true,
+  "allowExternalIdp": false,
+  "forceMfa": false,
+  "forceMfaLocalOnly": false,
+  "hidePasswordReset": false,
+  "ignoreUnknownUsernames": false,
+  "allowDomainDiscovery": false,
+  "disableLoginWithEmail": false,
+  "disableLoginWithPhone": true
+}

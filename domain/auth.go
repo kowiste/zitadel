@@ -17,4 +17,8 @@ type Auth interface {
 	UploadOrgLogo(orgID string, logoPath string) error
 	UpdateOrgColors(orgID string, config *BrandingConfig) error
 	ActivateBranding(orgID string) error
+
+	// Login Policy methods
+	SetOrgLoginPolicy(orgID string, config *LoginPolicyConfig) error
+	GetOrgLoginPolicy(orgID string) (*LoginPolicyConfig, error)
 }

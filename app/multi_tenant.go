@@ -93,6 +93,23 @@ func LoadBrandingConfig() (*domain.BrandingConfig, error) {
 	return &config, nil
 }
 
+// LoadLoginPolicyConfig loads the default login policy configuration from theme/login-policy.json
+func LoadLoginPolicyConfig() (*domain.LoginPolicyConfig, error) {
+	data, err := os.ReadFile("./theme/login-policy.json")
+	if err != nil {
+		// If file doesn't exist, return default config
+		fmt.Println("⚠️  No login-policy.json found, using default config")
+		return domain.DefaultLoginPolicyConfig(), nil
+	}
+
+	var config domain.LoginPolicyConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse login-policy.json: %w", err)
+	}
+
+	return &config, nil
+}
+
 // AddTenant creates a new tenant organization and grants access to the platform
 // Run this when a new customer/tenant registers
 func AddTenant(
@@ -155,6 +172,26 @@ func AddTenant(
 			fmt.Printf("⚠️  Failed to activate branding: %v\n", err)
 		} else {
 			fmt.Println("✓ Branding activated")
+		}
+	}
+
+	// 4. Apply Default Login Policy
+	fmt.Println("\nApplying default login policy...")
+	loginPolicyConfig, err := LoadLoginPolicyConfig()
+	if err != nil {
+		fmt.Printf("⚠️  Failed to load login policy config: %v\n", err)
+	} else {
+		// Set login policy (disable registration, etc.)
+		err = client.SetOrgLoginPolicy(tenantOrg.ID, loginPolicyConfig)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to set login policy: %v\n", err)
+		} else {
+			fmt.Println("✓ Login policy applied")
+			if !loginPolicyConfig.AllowRegister {
+				fmt.Println("  → User registration is DISABLED (Register button hidden)")
+			} else {
+				fmt.Println("  → User registration is ENABLED")
+			}
 		}
 	}
 

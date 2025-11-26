@@ -407,3 +407,46 @@ func (c *Client) ActivateBranding(orgID string) error {
 
 	return nil
 }
+
+// SetOrgLoginPolicy creates or updates the login policy for an organization
+// This controls authentication methods and user registration settings
+func (c *Client) SetOrgLoginPolicy(orgID string, config *domain.LoginPolicyConfig) error {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		SetBody(config).
+		Post("/management/v1/policies/login")
+
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+// GetOrgLoginPolicy retrieves the current login policy for an organization
+func (c *Client) GetOrgLoginPolicy(orgID string) (*domain.LoginPolicyConfig, error) {
+	resp, err := c.httpClient.R().
+		SetHeader("x-zitadel-orgid", orgID).
+		Get("/management/v1/policies/login")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var result struct {
+		Policy domain.LoginPolicyConfig `json:"policy"`
+	}
+	if err := json.Unmarshal(resp.Body(), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result.Policy, nil
+}
