@@ -17,8 +17,8 @@
               <v-text-field
                 v-model="organizationInput"
                 label="Organization Domain"
-                placeholder="e.g., Tesla-150405, Pepsi-150405"
-                hint="Enter your organization's primary domain"
+                placeholder="e.g., tesla-073704, pepsi-073704, nike-073704"
+                hint="Enter your organization name (case insensitive, .localhost will be added automatically)"
                 persistent-hint
                 :disabled="authStore.isLoading"
                 :error-messages="errorMessages"
@@ -71,11 +71,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
-const router = useRouter()
 const organizationInput = ref('')
 const formRef = ref()
 
@@ -92,7 +90,14 @@ async function handleLogin() {
   if (!organizationInput.value.trim()) return
 
   try {
-    const orgDomain = organizationInput.value.trim()
+    // Normalize organization domain: lowercase and ensure .localhost suffix
+    let orgDomain = organizationInput.value.trim().toLowerCase()
+
+    // Append .localhost if not already present
+    if (!orgDomain.endsWith('.localhost')) {
+      orgDomain = `${orgDomain}.localhost`
+    }
+
     await authStore.login(orgDomain)
     // User will be redirected to Zitadel, no need to navigate
   } catch (error) {

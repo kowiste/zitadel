@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"zitadel/app"
@@ -57,7 +58,9 @@ func main() {
 	tenants := make([]*app.TenantSetup, 0)
 
 	for _, tenantName := range tenantNames {
-		fullName := fmt.Sprintf("%s-%s", tenantName, suffix)
+		// Convert to lowercase for consistency
+		tenantNameLower := strings.ToLower(tenantName)
+		fullName := fmt.Sprintf("%s-%s", tenantNameLower, suffix)
 
 		tenant, err := app.AddTenant(client, platform, fullName)
 		if err != nil {
